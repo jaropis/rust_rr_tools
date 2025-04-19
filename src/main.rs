@@ -5,12 +5,19 @@ use std::path::PathBuf;
 struct Arguments<'a> {
     input_extension: &'a String,
     rr_multiplier: f32,
+    diff: bool,
 }
 
 fn parse_args(argv: &Vec<String>) -> Arguments {
+    let owned_multiplier = &argv[2].to_string();
+    let multiplier = owned_multiplier.parse::<f32>().unwrap();
+    let owned_diff = &argv[3].to_string();
+    let diff = owned_diff.parse::<bool>().unwrap();
+
     Arguments {
         input_extension: &argv[1],
-        rr_multiplier: 1000.0,
+        rr_multiplier: multiplier,
+        diff: diff,
     }
 }
 
@@ -24,7 +31,6 @@ fn read_lines(filepath: &str, args: &Arguments) -> Vec<Vec<String>> {
     };
 
     let owned_lines: Vec<String> = contents.lines().map(|s| s.to_string()).collect();
-    let diff = true;
     let mut result: Vec<Vec<String>> = Vec::new();
     let mut rr_idx: i32 = 0;
     let mut prev: f32 = 0.0;
@@ -35,7 +41,7 @@ fn read_lines(filepath: &str, args: &Arguments) -> Vec<Vec<String>> {
             let mut owned_word = word.to_string();
             if i == 0 {
                 if let Ok(num) = owned_word.parse::<f32>() {
-                    if diff {
+                    if args.diff {
                         current = num - prev;
                         println!("current: {}, prev: {}, num: {}", current, prev, num);
                         prev = num;
@@ -43,18 +49,18 @@ fn read_lines(filepath: &str, args: &Arguments) -> Vec<Vec<String>> {
                         current = num
                     }
 
-                    if diff && rr_idx == 0 {
+                    if args.diff && rr_idx == 0 {
                         prev = num;
                     }
                     println!("current: {}, prev: {}, num: {}", current, prev, num);
                     owned_word = (current * args.rr_multiplier).to_string();
                 }
             }
-            if (diff && rr_idx > 0) || (!diff) {
+            if (args.diff && rr_idx > 0) || (!args.diff) {
                 line.push(owned_word);
             }
         }
-        if (diff && rr_idx > 0) || (!diff) {
+        if (args.diff && rr_idx > 0) || (!args.diff) {
             result.push(line);
         }
         rr_idx += 1;
