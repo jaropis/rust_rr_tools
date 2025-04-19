@@ -6,6 +6,7 @@ struct Arguments<'a> {
     input_extension: &'a String,
     rr_multiplier: f32,
     diff: bool,
+    skip: i32,
 }
 
 fn parse_args(argv: &Vec<String>) -> Arguments {
@@ -13,11 +14,13 @@ fn parse_args(argv: &Vec<String>) -> Arguments {
     let multiplier = owned_multiplier.parse::<f32>().unwrap();
     let owned_diff = &argv[3].to_string();
     let diff = owned_diff.parse::<bool>().unwrap();
-
+    let owned_skip = &argv[4].to_string();
+    let skip = owned_skip.parse::<i32>().unwrap();
     Arguments {
         input_extension: &argv[1],
         rr_multiplier: multiplier,
-        diff: diff,
+        diff,
+        skip,
     }
 }
 
@@ -36,6 +39,11 @@ fn read_lines(filepath: &str, args: &Arguments) -> Vec<Vec<String>> {
     let mut prev: f32 = 0.0;
     let mut current: f32;
     for s in &owned_lines {
+        if rr_idx < args.skip {
+            rr_idx += 1;
+            continue;
+        }
+
         let mut line: Vec<String> = Vec::new();
         for (i, word) in s.split_whitespace().enumerate() {
             let mut owned_word = word.to_string();
@@ -43,24 +51,23 @@ fn read_lines(filepath: &str, args: &Arguments) -> Vec<Vec<String>> {
                 if let Ok(num) = owned_word.parse::<f32>() {
                     if args.diff {
                         current = num - prev;
-                        println!("current: {}, prev: {}, num: {}", current, prev, num);
                         prev = num;
                     } else {
                         current = num
                     }
 
-                    if args.diff && rr_idx == 0 {
+                    if args.diff && rr_idx == args.skip {
+                        println!("a kuku!");
                         prev = num;
                     }
-                    println!("current: {}, prev: {}, num: {}", current, prev, num);
                     owned_word = (current * args.rr_multiplier).to_string();
                 }
             }
-            if (args.diff && rr_idx > 0) || (!args.diff) {
+            if (args.diff && rr_idx > args.skip) || (!args.diff) {
                 line.push(owned_word);
             }
         }
-        if (args.diff && rr_idx > 0) || (!args.diff) {
+        if (args.diff && rr_idx > args.skip) || (!args.diff) {
             result.push(line);
         }
         rr_idx += 1;
