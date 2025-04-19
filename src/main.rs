@@ -7,6 +7,7 @@ struct Arguments<'a> {
     rr_multiplier: f32,
     diff: bool,
     skip: i32,
+    sampling_rate: f32,
 }
 
 fn parse_args(argv: &Vec<String>) -> Arguments {
@@ -16,11 +17,19 @@ fn parse_args(argv: &Vec<String>) -> Arguments {
     let diff = owned_diff.parse::<bool>().unwrap();
     let owned_skip = &argv[4].to_string();
     let skip = owned_skip.parse::<i32>().unwrap();
+    let sampling_rate: f32;
+    if argv.len() == 6 {
+        let owned_sampling_rate = &argv[5].to_string();
+        sampling_rate = owned_sampling_rate.parse::<f32>().unwrap();
+    } else {
+        sampling_rate = 0.0;
+    }
     Arguments {
         input_extension: &argv[1],
         rr_multiplier: multiplier,
         diff,
         skip,
+        sampling_rate,
     }
 }
 
@@ -57,10 +66,14 @@ fn read_lines(filepath: &str, args: &Arguments) -> Vec<Vec<String>> {
                     }
 
                     if args.diff && rr_idx == args.skip {
-                        println!("a kuku!");
                         prev = num;
                     }
-                    owned_word = (current * args.rr_multiplier).to_string();
+                    if args.sampling_rate == 0.0 {
+                        owned_word = (current * args.rr_multiplier).to_string();
+                    } else {
+                        owned_word =
+                            (current * args.rr_multiplier / args.sampling_rate).to_string();
+                    }
                 }
             }
             if (args.diff && rr_idx > args.skip) || (!args.diff) {
