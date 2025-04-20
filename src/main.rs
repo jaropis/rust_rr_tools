@@ -1,31 +1,43 @@
 use std::fs;
 use std::io;
 use std::path::PathBuf;
+
 #[derive(Debug)]
 struct Arguments<'a> {
     input_extension: &'a String,
+    output_extension: &'a String,
     rr_multiplier: f32,
     diff: bool,
     skip: i32,
     sampling_rate: f32,
 }
 
+fn form_result_path(filepath: &str, extension: &str) -> String {
+    let result_path = std::path::Path::new(filepath);
+    let stem = result_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("");
+    let dir = result_path.parent().and_then(|s| s.to_str()).unwrap_or("");
+    format!("{}/{}.{}", dir, stem, extension)
+}
 fn parse_args(argv: &Vec<String>) -> Arguments {
-    let owned_multiplier = &argv[2].to_string();
+    let owned_multiplier = &argv[3].to_string();
     let multiplier = owned_multiplier.parse::<f32>().unwrap();
-    let owned_diff = &argv[3].to_string();
+    let owned_diff = &argv[4].to_string();
     let diff = owned_diff.parse::<bool>().unwrap();
-    let owned_skip = &argv[4].to_string();
+    let owned_skip = &argv[5].to_string();
     let skip = owned_skip.parse::<i32>().unwrap();
     let sampling_rate: f32;
-    if argv.len() == 6 {
-        let owned_sampling_rate = &argv[5].to_string();
+    if argv.len() == 7 {
+        let owned_sampling_rate = &argv[6].to_string();
         sampling_rate = owned_sampling_rate.parse::<f32>().unwrap();
     } else {
         sampling_rate = 0.0;
     }
     Arguments {
         input_extension: &argv[1],
+        output_extension: &argv[2],
         rr_multiplier: multiplier,
         diff,
         skip,
@@ -100,7 +112,9 @@ fn main() -> io::Result<()> {
         if entry_path.extension().and_then(|s| s.to_str()) == Some(args.input_extension) {
             println!("file: {:?}", entry_path);
             let contents = read_lines(&entry_path.to_str().unwrap(), &args);
-            println!("contents length: {:?}", contents);
+            let filepaht = form_result_path(&entry_path.to_str().unwrap(), &args.output_extension);
+            println!("contents: {:?}", contents);
+            println!("resutl_path: {}", filepaht);
         }
     }
     Ok(())
