@@ -1,5 +1,8 @@
+use std::collections::HashSet;
 use std::fs;
+use std::fs::File;
 use std::io;
+use std::io::Write;
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -10,6 +13,7 @@ struct Arguments<'a> {
     diff: bool,
     skip: i32,
     sampling_rate: f32,
+    scout: bool,
 }
 
 fn form_result_path(filepath: &str, extension: &str) -> String {
@@ -29,8 +33,10 @@ fn parse_args(argv: &Vec<String>) -> Arguments {
     let owned_skip = &argv[5].to_string();
     let skip = owned_skip.parse::<i32>().unwrap();
     let sampling_rate: f32;
-    if argv.len() == 7 {
-        let owned_sampling_rate = &argv[6].to_string();
+    let owned_scout = &argv[6].to_string();
+    let scout = owned_scout.parse::<bool>().unwrap();
+    if argv.len() == 8 {
+        let owned_sampling_rate = &argv[7].to_string();
         sampling_rate = owned_sampling_rate.parse::<f32>().unwrap();
     } else {
         sampling_rate = 0.0;
@@ -42,10 +48,11 @@ fn parse_args(argv: &Vec<String>) -> Arguments {
         diff,
         skip,
         sampling_rate,
+        scout,
     }
 }
 
-fn read_lines(filepath: &str, args: &Arguments) -> Vec<Vec<String>> {
+fn read_lines(filepath: &str, args: &Arguments) -> (Vec<Vec<String>>, HashSet<String>) {
     let contents = match fs::read_to_string(filepath) {
         Ok(data) => data,
         Err(_) => {
@@ -56,6 +63,7 @@ fn read_lines(filepath: &str, args: &Arguments) -> Vec<Vec<String>> {
 
     let owned_lines: Vec<String> = contents.lines().map(|s| s.to_string()).collect();
     let mut result: Vec<Vec<String>> = Vec::new();
+    let mut annotations: HashSet<String> = HashSet::new();
     let mut rr_idx: i32 = 0;
     let mut prev: f32 = 0.0;
     let mut current: f32;
@@ -87,6 +95,14 @@ fn read_lines(filepath: &str, args: &Arguments) -> Vec<Vec<String>> {
                             (current * args.rr_multiplier / args.sampling_rate).to_string();
                     }
                 }
+            } else if i == 1 {
+                annotations.insert(owned_word.clone());
+                owned_word = match owned_word.as_str() {
+                    "N" => "0".to_string(),
+                    "V" => "1".to_string(),
+                    "S" => "2".to_string(),
+                    _ => "3".to_string(),
+                }
             }
             if (args.diff && rr_idx > args.skip) || (!args.diff) {
                 line.push(owned_word);
@@ -98,24 +114,43 @@ fn read_lines(filepath: &str, args: &Arguments) -> Vec<Vec<String>> {
         rr_idx += 1;
     }
 
-    result
+    (result, annotations)
 }
 
+fn write_rrs(data: &Vec<Vec<String>>, output_path: &str) -> std::io::Result<()> {
+    let mut file = File::create(output_path)?;
+    writeln!(file, "RR\tannot")?;
+
+    // writing data
+    for row in data {
+        if row.len() >= 2 {
+            writeln!(file, "{}\t{}", row[0], row[1])?;
+        }
+    }
+    Ok(())
+}
 fn main() -> io::Result<()> {
     let argv: Vec<String> = std::env::args().collect();
     let args = parse_args(&argv);
     println!("args: {:?}", args);
+    let mut annotation_store: HashSet<String> = HashSet::new();
     let current_dir: PathBuf = std::env::current_dir().unwrap();
-    println!("current dir: {:?}", current_dir);
-    for entry in fs::read_dir(current_dir).unwrap() {
+    let available_files = fs::read_dir(current_dir).unwrap();
+    for (i, entry) in available_files.enumerate() {
         let entry_path = entry.unwrap().path();
+        println!("{}, processing {:?}", i, entry_path);
         if entry_path.extension().and_then(|s| s.to_str()) == Some(args.input_extension) {
-            println!("file: {:?}", entry_path);
-            let contents = read_lines(&entry_path.to_str().unwrap(), &args);
-            let filepaht = form_result_path(&entry_path.to_str().unwrap(), &args.output_extension);
-            println!("contents: {:?}", contents);
-            println!("resutl_path: {}", filepaht);
+            let (contents, new_annotations) = read_lines(&entry_path.to_str().unwrap(), &args);
+            annotation_store.extend(new_annotations);
+            let filepath = form_result_path(&entry_path.to_str().unwrap(), &args.output_extension);
+            if !args.scout {
+                match write_rrs(&contents, &filepath) {
+                    Ok(_) => {}
+                    Err(e) => eprintln!("encountered error {}  writing {}", e, filepath),
+                }
+            }
         }
     }
+    println!("Unique annotations: {:?}", annotation_store);
     Ok(())
 }
