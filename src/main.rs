@@ -66,6 +66,7 @@ fn read_lines(filepath: &str, args: &Arguments) -> (Vec<Vec<String>>, HashSet<St
     let mut annotations: HashSet<String> = HashSet::new();
     let mut rr_idx: i32 = 0;
     let mut prev: f32 = 0.0;
+    // let mut prev_annot = "0".to_string();
     let mut current: f32;
     for s in &owned_lines {
         if rr_idx < args.skip {
@@ -96,13 +97,17 @@ fn read_lines(filepath: &str, args: &Arguments) -> (Vec<Vec<String>>, HashSet<St
                     }
                 }
             } else if i == 1 {
-                annotations.insert(owned_word.clone());
                 owned_word = match owned_word.as_str() {
                     "N" => "0".to_string(),
                     "V" => "1".to_string(),
                     "S" => "2".to_string(),
                     _ => "3".to_string(),
-                }
+                };
+                // if args.diff && prev_annot != "0" {
+                //     owned_word = prev_annot.clone();
+                //     prev_annot = owned_word.clone();
+                // }
+                annotations.insert(owned_word.clone());
             }
             if (args.diff && rr_idx > args.skip) || (!args.diff) {
                 line.push(owned_word);
