@@ -1,5 +1,6 @@
 # rust_rr_tools
-RRI: 
+
+RRI:
 ./rust_rr_tools "rri" "rea" 1000 true 3 false 1024
 cargo run "rri" "rea" 1000 true 3 false 1024
 MASTER
