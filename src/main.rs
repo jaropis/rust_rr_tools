@@ -14,6 +14,7 @@ struct Arguments<'a> {
     skip: i32,
     sampling_rate: f32,
     scout: bool,
+    correct: bool,
 }
 
 fn form_result_path(filepath: &str, extension: &str) -> String {
@@ -35,8 +36,10 @@ fn parse_args(argv: &Vec<String>) -> Arguments {
     let sampling_rate: f32;
     let owned_scout = &argv[6].to_string();
     let scout = owned_scout.parse::<bool>().unwrap();
-    if argv.len() == 8 {
-        let owned_sampling_rate = &argv[7].to_string();
+    let owned_correct = &argv[7].to_string();
+    let correct = owned_correct.parse::<bool>().unwrap();
+    if argv.len() == 9 {
+        let owned_sampling_rate = &argv[8].to_string();
         sampling_rate = owned_sampling_rate.parse::<f32>().unwrap();
     } else {
         sampling_rate = 0.0;
@@ -49,6 +52,7 @@ fn parse_args(argv: &Vec<String>) -> Arguments {
         skip,
         sampling_rate,
         scout,
+        correct,
     }
 }
 
@@ -137,6 +141,49 @@ fn write_rrs(data: &Vec<Vec<String>>, output_path: &str) -> std::io::Result<()> 
     }
     Ok(())
 }
+fn correct_rr_intervals(data: &mut Vec<Vec<String>>) {
+    // calculating average of all RR intervals with flag 0
+    let mut sum_flag_0: f32 = 0.0;
+    let mut count_flag_0: i32 = 0;
+
+    for row in data.iter() {
+        if row.len() >= 2 && row[1] == "0" {
+            if let Ok(rr_value) = row[0].parse::<f32>() {
+                sum_flag_0 += rr_value;
+                count_flag_0 += 1;
+            }
+        }
+    }
+
+    if count_flag_0 == 0 {
+        println!("Warning: No RR intervals with flag 0 found for correction");
+        return;
+    }
+
+    let average_rr_flag_0 = sum_flag_0 / count_flag_0 as f32;
+    let threshold = 5.0 * average_rr_flag_0;
+
+    println!(
+        "Average RR for flag 0: {:.3}, threshold: {:.3}",
+        average_rr_flag_0, threshold
+    );
+
+    // replacing outliers with the average
+    let mut corrected_count = 0;
+    for row in data.iter_mut() {
+        if row.len() >= 2 && row[1] != "0" {
+            if let Ok(rr_value) = row[0].parse::<f32>() {
+                if rr_value > threshold {
+                    row[0] = average_rr_flag_0.to_string();
+                    corrected_count += 1;
+                }
+            }
+        }
+    }
+
+    println!("Corrected {} outlier RR intervals", corrected_count);
+}
+
 fn main() -> io::Result<()> {
     let argv: Vec<String> = std::env::args().collect();
     let args = parse_args(&argv);
@@ -148,8 +195,14 @@ fn main() -> io::Result<()> {
         let entry_path = entry.unwrap().path();
         println!("{}, processing {:?}", i, entry_path);
         if entry_path.extension().and_then(|s| s.to_str()) == Some(args.input_extension) {
-            let (contents, new_annotations) = read_lines(&entry_path.to_str().unwrap(), &args);
+            let (mut contents, new_annotations) = read_lines(&entry_path.to_str().unwrap(), &args);
             annotation_store.extend(new_annotations);
+
+            // Apply correction if the correct flag is true
+            if args.correct {
+                correct_rr_intervals(&mut contents);
+            }
+
             let filepath = form_result_path(&entry_path.to_str().unwrap(), &args.output_extension);
             if !args.scout {
                 match write_rrs(&contents, &filepath) {
