@@ -56,6 +56,53 @@ fn parse_args(argv: &Vec<String>) -> Arguments {
     }
 }
 
+fn correct_processed_rr_intervals(data: &mut Vec<Vec<String>>) {
+    println!("Starting correction with {} rows", data.len());
+
+    // calculating average of all RR intervals with flag 0
+    let mut sum_flag_0: f32 = 0.0;
+    let mut count_flag_0: i32 = 0;
+
+    for row in data.iter() {
+        if row.len() >= 2 && row[1] == "0" {
+            if let Ok(rr_value) = row[0].parse::<f32>() {
+                sum_flag_0 += rr_value;
+                count_flag_0 += 1;
+            }
+        }
+    }
+
+    if count_flag_0 == 0 {
+        println!("Warning: No RR intervals with flag 0 found for correction");
+        return;
+    }
+
+    let average_rr_flag_0 = sum_flag_0 / count_flag_0 as f32;
+    let threshold = 5.0 * average_rr_flag_0;
+
+    println!(
+        "Average RR for flag 0: {:.3}, threshold: {:.3}",
+        average_rr_flag_0, threshold
+    );
+
+    // replacing outliers with the average
+    let mut corrected_count = 0;
+    for row in data.iter_mut() {
+        if row.len() >= 2 {
+            if let Ok(rr_value) = row[0].parse::<f32>() {
+                if rr_value.abs() > threshold {
+                    // Use abs() to catch negative outliers too
+                    println!("Correcting RR value {} to {}", rr_value, average_rr_flag_0);
+                    row[0] = average_rr_flag_0.to_string();
+                    corrected_count += 1;
+                }
+            }
+        }
+    }
+
+    println!("Corrected {} outlier RR intervals", corrected_count);
+}
+
 fn read_lines(filepath: &str, args: &Arguments) -> (Vec<Vec<String>>, HashSet<String>) {
     let contents = match fs::read_to_string(filepath) {
         Ok(data) => data,
@@ -66,6 +113,7 @@ fn read_lines(filepath: &str, args: &Arguments) -> (Vec<Vec<String>>, HashSet<St
     };
 
     let owned_lines: Vec<String> = contents.lines().map(|s| s.to_string()).collect();
+
     let mut result: Vec<Vec<String>> = Vec::new();
     let mut annotations: HashSet<String> = HashSet::new();
     let mut rr_idx: i32 = 0;
@@ -141,49 +189,6 @@ fn write_rrs(data: &Vec<Vec<String>>, output_path: &str) -> std::io::Result<()> 
     }
     Ok(())
 }
-fn correct_rr_intervals(data: &mut Vec<Vec<String>>) {
-    // calculating average of all RR intervals with flag 0
-    let mut sum_flag_0: f32 = 0.0;
-    let mut count_flag_0: i32 = 0;
-
-    for row in data.iter() {
-        if row.len() >= 2 && row[1] == "0" {
-            if let Ok(rr_value) = row[0].parse::<f32>() {
-                sum_flag_0 += rr_value;
-                count_flag_0 += 1;
-            }
-        }
-    }
-
-    if count_flag_0 == 0 {
-        println!("Warning: No RR intervals with flag 0 found for correction");
-        return;
-    }
-
-    let average_rr_flag_0 = sum_flag_0 / count_flag_0 as f32;
-    let threshold = 5.0 * average_rr_flag_0;
-
-    println!(
-        "Average RR for flag 0: {:.3}, threshold: {:.3}",
-        average_rr_flag_0, threshold
-    );
-
-    // replacing outliers with the average
-    let mut corrected_count = 0;
-    for row in data.iter_mut() {
-        if row.len() >= 2 && row[1] != "0" {
-            if let Ok(rr_value) = row[0].parse::<f32>() {
-                if rr_value > threshold {
-                    row[0] = average_rr_flag_0.to_string();
-                    corrected_count += 1;
-                }
-            }
-        }
-    }
-
-    println!("Corrected {} outlier RR intervals", corrected_count);
-}
-
 fn main() -> io::Result<()> {
     let argv: Vec<String> = std::env::args().collect();
     let args = parse_args(&argv);
@@ -200,7 +205,7 @@ fn main() -> io::Result<()> {
 
             // Apply correction if the correct flag is true
             if args.correct {
-                correct_rr_intervals(&mut contents);
+                correct_processed_rr_intervals(&mut contents);
             }
 
             let filepath = form_result_path(&entry_path.to_str().unwrap(), &args.output_extension);
