@@ -17,14 +17,18 @@ struct Arguments<'a> {
     correct: bool,
 }
 
-fn form_result_path(filepath: &str, extension: &str) -> String {
+fn form_result_path(filepath: &str, extension: &str, prefix: Option<&str>) -> String {
     let result_path = std::path::Path::new(filepath);
     let stem = result_path
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("");
     let dir = result_path.parent().and_then(|s| s.to_str()).unwrap_or("");
-    format!("{}/{}.{}", dir, stem, extension)
+
+    match prefix {
+        Some(prefix) => format!("{}/{}{}.{}", dir, prefix, stem, extension),
+        None => format!("{}/{}.{}", dir, stem, extension),
+    }
 }
 fn parse_args(argv: &Vec<String>) -> Arguments {
     let owned_multiplier = &argv[3].to_string();
@@ -78,7 +82,7 @@ fn correct_processed_rr_intervals(data: &mut Vec<Vec<String>>) {
     }
 
     let average_rr_flag_0 = sum_flag_0 / count_flag_0 as f32;
-    let threshold = 5.0 * average_rr_flag_0;
+    let threshold = 300.0;
 
     println!(
         "Average RR for flag 0: {:.3}, threshold: {:.3}",
@@ -208,7 +212,16 @@ fn main() -> io::Result<()> {
                 correct_processed_rr_intervals(&mut contents);
             }
 
-            let filepath = form_result_path(&entry_path.to_str().unwrap(), &args.output_extension);
+            let prefix = if args.correct {
+                Some("corrected_")
+            } else {
+                None
+            };
+            let filepath = form_result_path(
+                &entry_path.to_str().unwrap(),
+                &args.output_extension,
+                prefix,
+            );
             if !args.scout {
                 match write_rrs(&contents, &filepath) {
                     Ok(_) => {}
