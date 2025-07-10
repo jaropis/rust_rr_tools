@@ -103,6 +103,20 @@ This helps remove physiologically implausible values that may result from detect
 ./rust_rr_tools "rri" "rea" 1000 true 3 false true 1024
 ```
 
+### RRI
+
+```bash
+./rust_rr_tools "rri" "rea" 1000 true 3 false false 1024
+cargo run "rri" "rea" 1000 true 3 false false 1024
+```
+
+### MASTER
+
+```bash
+./rust_rr_tools "txt" "rea" 1000 true 1 true false
+cargo run "txt" "rea" 1000 false 1 true false
+```
+
 - Process files with `.rri` extension
 - Output files with `.rea` extension
 - Multiply RR intervals by 1000 (seconds to milliseconds)
